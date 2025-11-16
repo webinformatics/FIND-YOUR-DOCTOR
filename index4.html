@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Find Your Doctor - Kolkata Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+
+  <style>
+    html, body { height:100%; margin:0; font-family:"Segoe UI",Arial, Helvetica, sans-serif; background:#f4f6fa; }
+    #map { height:100vh; width:100%; z-index:1; }
+
+    /* HEADER */
+    #header {
+      position:absolute; top:0; left:0; width:100%;
+      background:linear-gradient(90deg,#0b3954,#087e8b);
+      color:white; text-align:center;
+      padding:12px 0; font-size:26px; font-weight:bold;
+      z-index:1600; letter-spacing:1px;
+    }
+
+    /* LEFT CONTROL PANEL */
+    #control-panel {
+      position:absolute; top:80px; left:15px; width:300px;
+      background:rgba(255,255,255,0.98); border-radius:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.25); padding:15px; z-index:1500;
+    }
+
+    #control-panel h3 {
+      margin:6px 0 10px; text-align:center;
+      background:#087e8b; color:white; padding:6px 0;
+      border-radius:6px; font-size:15px;
+    }
+
+    label { display:block; margin-top:8px; font-weight:600; color:#222; }
+    select, button { width:100%; padding:8px; margin-top:5px;
+      border-radius:6px; font-size:14px; border:1px solid #ccc; cursor:pointer;
+    }
+
+    button { background:#087e8b; color:white; font-weight:bold; }
+    button.black { background:#000 !important; color:white !important; }
+
+    #feedback { margin-top:12px; padding-top:10px; border-top:1px dashed #ccc; }
+    .rating { display:flex; justify-content:space-between; gap:5px; margin-top:6px; }
+    .rating span {
+      flex:1; text-align:center; padding:6px 0;
+      background:#efefef; border-radius:5px; cursor:pointer; font-weight:bold;
+    }
+    .rating span.active { background:#2ecc71; color:white; }
+
+    #footer {
+      position:absolute; bottom:10px; right:10px;
+      background:rgba(255,255,255,0.95); padding:8px 12px;
+      border-radius:8px; font-size:12px; color:#111; text-align:right;
+      max-width:360px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:1600;
+    }
+
+    #status {
+      position:absolute; bottom:12px; left:12px; z-index:1500;
+      background:rgba(0,0,0,0.6); color:#fff;
+      padding:6px 8px; border-radius:6px; font-size:13px;
+    }
+  </style>
+</head>
+<body>
+  <div id="header">FIND YOUR DOCTOR</div>
+
+  <div id="control-panel">
+    <h3>PUT YOUR CHOICE</h3>
+    <label for="specialty">SPECIALIZATION</label>
+    <select id="specialty">
+      <option value="All">All</option>
+      <option value="Allergist">Allergist</option>
+      <option value="Cardiologist">Cardiologist</option>
+      <option value="Endocrinologist">Endocrinologist</option>
+      <option value="Gastroenterologist">Gastroenterologist</option>
+      <option value="Hematologist">Hematologist</option>
+      <option value="Urologist">Urologist</option>
+      <option value="Nephrologist">Nephrologist</option>
+      <option value="Oncologist">Oncologist</option>
+      <option value="Ophthalmologist">Ophthalmologist</option>
+      <option value="Orthopedic Sergeon">Orthopedic Sergeon</option>
+      <option value="Plastic Sergeon">Plastic Sergeon</option>
+      <option value="Pulmologist">Pulmologist</option>
+      <option value="Rheumatologist">Rheumatologist</option>
+    </select>
+    <button id="zoomAll" class="black">OK</button>
+
+    <h3>HOW TO REACH</h3>
+    <label>Click on map to set locations</label>
+    <button id="setSource" class="black">Set SOURCE on Map</button>
+    <button id="setDest" class="black">Set DESTINATION on Map</button>
+    <button id="goRoute" class="black">GO</button>
+
+    <div id="feedback">
+      <h3>FEEDBACK</h3>
+      <small>This application is helpful</small>
+      <div style="display:flex; gap:8px; margin-top:6px;">
+        <button id="yesBtn">YES</button>
+        <button id="noBtn">NO</button>
+      </div>
+      <small style="display:block; margin-top:8px;">You are giving</small>
+      <div class="rating" id="ratingBtns">
+        <span data-val="1">1</span>
+        <span data-val="2">2</span>
+        <span data-val="3">3</span>
+        <span data-val="4">4</span>
+      </div>
+      <button id="thankYou" class="black" style="margin-top:8px;">THANK YOU</button>
+    </div>
+  </div>
+
+  <div id="map"></div>
+  <div id="status">Loading datasets…</div>
+
+  <div id="footer">
+    Prepared by: <b>3rd Semester Students (Batch-2024-26)</b><br>
+    (Dept. of Earth Sciences & Remote Sensing, JIS University)<br>
+    Under guidance of <b>Dr. Ratnadeep Ray</b>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+  <script>
+  (async function(){
+    const map = L.map('map').setView([22.5726,88.3639],11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+
+    const statusEl=document.getElementById('status');
+    const sources=[
+      {file:'ALERGIST_Kolkata_2.html',varName:'Alergist',key:'Allergist'},
+      {file:'Cardiologist_Kolkata.html',varName:'cardiologists',key:'Cardiologist'},
+      {file:'ENDOCRINOLOGIST_Kolkata.html',varName:'Endocrinologist',key:'Endocrinologist'},
+      {file:'GASTROENTEROLOGIST_Kolkata.html',varName:'Gastroenterologist',key:'Gastroenterologist'},
+      {file:'HEMATOLOGIST_Kolkata_1.html',varName:'Hematologist',key:'Hematologist'},
+      {file:'UROLOGIST_kolkata.html',varName:'Urologist',key:'Urologist'},
+      {file:'NEPHROLOGIST_kolkata.html',varName:'Nephrologist',key:'Nephrologist'},
+      {file:'Oncologist_kolkata.html',varName:'Oncologist',key:'Oncologist'},
+      {file:'Ophthalmologist_kolkata.html',varName:'Ophthalmologist',key:'Ophthalmologist'},
+      {file:'ORTHOPEDIC SURGEON.html',varName:'Orthopedic Sergeon',key:'Orthopedic Sergeon'},
+      {file:'PLUSTIC SURGEON.html',varName:'Plastic Sergeon',key:'Plastic Sergeon'},
+      {file:'Pulmologist_kolkata.html',varName:'Pulmologist',key:'Pulmologist'},
+      {file:'Rheumatologist_kolkata.html',varName:'Rheumatologist',key:'Rheumatologist'}
+    ];
+
+    async function fetchAndExtractArray(file,varName){
+      try{
+        const resp=await fetch(file);
+        if(!resp.ok) throw new Error(resp.status);
+        const text=await resp.text();
+        const pattern=new RegExp('(const|let|var)\\s+'+varName+'\\s*=\\s*(\\[([\\s\\S]*?)\\])\\s*;','m');
+        const m=text.match(pattern);
+        if(!m) return [];
+        const fn=new Function('return ('+m[2]+');'); return fn();
+      }catch(e){return [];}
+    }
+
+    const datasets={};
+    for(const s of sources){ datasets[s.key]=await fetchAndExtractArray(s.file,s.varName); }
+
+    function createCluster(data){
+      const g=L.markerClusterGroup({iconCreateFunction:c=>{
+        const count=c.getChildCount();
+        return L.divIcon({html:`<div style="background:#e74c3c;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;"><b>${count}</b></div>`,iconSize:[30,30]});
+      }});
+      data.forEach(loc=>{
+        if(!loc.lat||!loc.lng) return;
+        const popup=(loc.doctors||[]).map(d=>`<b>${d.name||''}</b><br>${d.specialty||''}<br>${d.hospital||''}<br>📞 ${d.phone||''}<hr>`).join('');
+        g.addLayer(L.marker([loc.lat,loc.lng]).bindPopup(popup));
+         });
+      return g;
+    }
+
+    const clusters={};
+    for(const key of Object.keys(datasets)) clusters[key]=createCluster(datasets[key]);
+    Object.values(clusters).forEach(c=>map.addLayer(c));
+    statusEl.textContent='Ready.';
+
+    // === Specialization filter ===
+    const select=document.getElementById('specialty');
+    const zoomBtn=document.getElementById('zoomAll');
+    function updateVisible(){
+      Object.values(clusters).forEach(c=>map.removeLayer(c));
+      const sel=select.value;
+      if(sel==='All') Object.values(clusters).forEach(c=>map.addLayer(c));
+      else if(clusters[sel]) map.addLayer(clusters[sel]);
+    }
+    select.addEventListener('change',updateVisible);
+    zoomBtn.addEventListener('click',()=>{
+      updateVisible();
+      let bounds=null; const sel=select.value;
+      const groups=(sel==='All')?Object.values(clusters):[clusters[sel]];
+      groups.forEach(g=>{const b=g.getBounds(); if(b.isValid()) bounds=bounds?bounds.extend(b):b;});
+      if(bounds) map.fitBounds(bounds.pad(0.12),{maxZoom:15});
+    });
+
+    // === HOW TO REACH ===
+    let sourceMarker=null,destMarker=null,routeLayer=null;
+    let setSrc=false,setDst=false;
+
+    document.getElementById('setSource').addEventListener('click',()=>{
+      setSrc=true; setDst=false; statusEl.textContent='Click on map to set SOURCE';
+    });
+    document.getElementById('setDest').addEventListener('click',()=>{
+      setDst=true; setSrc=false; statusEl.textContent='Click on map to set DESTINATION';
+    });
+
+    map.on('click', function(e) {
+  const smallIcon = L.icon({
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    iconSize: [18, 28], // smaller than default
+    iconAnchor: [9, 28],
+    popupAnchor: [0, -25]
+  });
+
+  const greenDot = L.divIcon({
+    html: '<div style="background-color:green;width:16px;height:16px;border-radius:50%;border:2px solid white;"></div>',
+    iconSize: [16, 16],
+    className: ''
+  });
+
+  const redDot = L.divIcon({
+    html: '<div style="background-color:red;width:16px;height:16px;border-radius:50%;border:2px solid white;"></div>',
+    iconSize: [16, 16],
+    className: ''
+  });
+
+  if (setSrc) {
+    if (sourceMarker) map.removeLayer(sourceMarker);
+    sourceMarker = L.marker(e.latlng, { icon: greenDot, title: 'Source' })
+      .addTo(map)
+      .bindPopup('Source')
+      .openPopup();
+    setSrc = false;
+    statusEl.textContent = 'Source set.';
+  } else if (setDst) {
+    if (destMarker) map.removeLayer(destMarker);
+    destMarker = L.marker(e.latlng, { icon: redDot, title: 'Destination' })
+      .addTo(map)
+      .bindPopup('Destination')
+      .openPopup();
+    setDst = false;
+    statusEl.textContent = 'Destination set.';
+  }
+});
+
+    async function drawRoute(lat1,lng1,lat2,lng2){
+  const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson`;
+  const r = await fetch(url);
+  const j = await r.json();
+
+  if (routeLayer) map.removeLayer(routeLayer);
+
+  // Draw the route line
+  routeLayer = L.geoJSON(j.routes[0].geometry, {
+    style: { color: '#000', weight: 5 }
+  }).addTo(map);
+  map.fitBounds(routeLayer.getBounds().pad(0.2));
+
+  // === Calculate and show distance & time ===
+  const distanceKm = (j.routes[0].distance / 1000).toFixed(2); // in km
+  const durationMin = (j.routes[0].duration / 60).toFixed(1);  // in minutes
+
+  // Show in status bar
+  statusEl.textContent = `Distance: ${distanceKm} km | Duration: ${durationMin} min`;
+
+  // Optional popup at destination
+  if (destMarker) {
+    destMarker.bindPopup(
+      `<b>Route Information</b><br>Distance: ${distanceKm} km<br>Duration: ${durationMin} min`
+    ).openPopup();
+  }
+}
+
+
+    document.getElementById('goRoute').addEventListener('click',async()=>{
+      if(!sourceMarker||!destMarker){alert('Please select both Source and Destination');return;}
+      const s=sourceMarker.getLatLng(); const d=destMarker.getLatLng();
+      await drawRoute(s.lat,s.lng,d.lat,d.lng);
+      statusEl.textContent='Route displayed.';
+    });
+
+    // === FEEDBACK ===
+    const yesBtn=document.getElementById('yesBtn');
+    const noBtn=document.getElementById('noBtn');
+    yesBtn.addEventListener('click',()=>{
+      window.location.href=`mailto:rsgis705@gmail.com?subject=App Feedback&body=This application is helpful: YES`;
+    });
+    noBtn.addEventListener('click',()=>{
+      window.location.href=`mailto:rsgis705@gmail.com?subject=App Feedback&body=This application is helpful: NO`;
+    });
+
+    // === RATING ===
+    let ratingVal=null;
+    document.querySelectorAll('#ratingBtns span').forEach(sp=>{
+      sp.addEventListener('click',()=>{
+        document.querySelectorAll('#ratingBtns span').forEach(s=>s.classList.remove('active'));
+        sp.classList.add('active'); ratingVal=sp.dataset.val;
+      });
+    });
+    document.getElementById('thankYou').addEventListener('click',()=>{
+      if(!ratingVal){alert('Please select a rating');return;}
+      window.location.href=`mailto:rsgis705@gmail.com?subject=App Rating&body=User rating: ${ratingVal}`;
+      document.querySelectorAll('#ratingBtns span').forEach(s=>s.classList.add('active'));
+    });
+
+  })();
+  </script>
+</body>
+</html>
